@@ -14,7 +14,7 @@ os.environ["webdriver.chrome.driver"] = chromedriver
 URL = 'http://de.vroniplag.wikia.com/'
 Soup = lambda x: BeautifulSoup(x, 'html.parser')
 
-
+#get all texts with that are not black in font-colour 
 def getplagtags(url):
     soup = Soup(gethtml(url))
     frgtab = soup.find('table', attrs={'class': 'ueberpruefte-fragmentseiten'})
@@ -29,16 +29,15 @@ def getplagtags(url):
     driver.quit()
     return lst
 
-
+#create an xml text with starting positions of each plagiarism section and length
 def crtxml(cd, lst):
     return '''<?xml version="1.0" encoding="UTF-8"?>
     <document xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.uni-weimar.de/medien/webis/research/corpora/pan-pc-09/document.xsd" reference="suspicious-document00001.txt">
       <feature name="vroniplag" etext_number="''' + cd + '''" url="http://de.vroniplag.wikia.com/wiki/''' + cd + ''''"/>
       <feature name="language" value="de" />
-    ''' + '\n'.join(['<feature name="artificial-plagiarism" translation="false" obfuscation="' + ls[
-        0] + '" this_offset="' + str(ls[1]) + '" this_length="' + str(ls[2]) + '" />' for ls in lst]) + '\n</document>'
+    ''' + '\n'.join(['<feature name="artificial-plagiarism" this_offset="' + str(ls[1]) + '" this_length="' + str(ls[2]) + '" />' for ls in lst]) + '\n</document>'
 
-
+#read each web page and return the html text
 def gethtml(link):
     time.sleep(2)
     req = urllib2.Request(link, headers={'User-Agent': "Magic Browser"})
@@ -46,7 +45,7 @@ def gethtml(link):
     html = con.read()
     return html
 
-
+#convert the pdf to text
 def getmetadata(filename):
     if not filename.endswith('.pdf'):
         sys.exit(filename + ' is not pdf')
@@ -67,33 +66,32 @@ def getmetadata(filename):
     xml = r.content
     return xml
 
-
+#convert html to text
 def getcont(xml):
     soup = Soup(xml)
     paratags = soup.findAll("region", attrs={"class": "DoCO:TextChunk"})
     paras = '\n\n'.join([tag.text for tag in paratags])
     return paras
 
-
+#put all functions in order
 def txt2pdf(nm):
     cd = nm[:-4]
-    content = getcont(getmetadata(nm)).encode('utf-8')
-    with open(cd + '.txt', 'wb') as outtxt:
+    content = getcont(getmetadata(nm)).encode('utf-8') #write 
+    with open(cd + '.txt', 'wb') as outtxt: #writes pdf text to file
         outtxt.write(content)
     url = URL + cd
     print url
-    plagsecs = getplagtags(url)
+    plagsecs = getplagtags(url) #get all plagiarsed sections
     offslst = []
-    for sec in plagsecs:
+    for sec in plagsecs: #each section is searched in the text of the pdf
         ind = content.find(sec[1].encode('utf-8'))
         leng = len(sec[1])
-        obf = 'low'
         if ind != -1 and leng != 0:
             offslst.append([obf, ind, leng])
-    with open(cd + '.xml', 'wb') as outxml:
+    with open(cd + '.xml', 'wb') as outxml: #write xml to text
         outxml.write(crtxml(cd, offslst))
 
-
+#main function to read arguments from the command line
 def Main():
     parser = argparse.ArgumentParser(description='Vroni Downloader')
     parser.add_argument('pdf', type=str, help='PDF to operate on')
